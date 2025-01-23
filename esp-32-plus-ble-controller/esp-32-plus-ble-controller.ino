@@ -7,9 +7,10 @@
 #include <FastLED.h> // http://librarymanager/All#FastLED
 
 #include <Wire.h> // Needed for I2C
-#include "SparkFun_Qwiic_Joystick_Arduino_Library.h"
+#include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
 #include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h> // Click here to get the library: http://librarymanager/All#SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library
-
+#include <UUID.h>
+#include <Preferences.h>
 
 // Status LED Settings.
 #define LED_PIN     46 //Pin 46 on Thing Plus C S3 is connected to WS2812 LED
@@ -29,6 +30,15 @@ bool ErrorOnInit = false;
 // BLE Specific Flags
 bool isConnected = false;
 bool isScanning = false;
+
+// UUID
+UUID uuid;
+
+// Preferences
+Preferences preferences;
+String device_uuid;
+
+
 
 // ================================================================================
 int STATUS_LED_MODE;
@@ -270,7 +280,7 @@ JOYSTICK joystick;
 int buttonDownStart;
 bool prevButtonDown;
 #define BUTTON_DOWN_PAIR_TIME 3000
-#define BUTTON_DOWN_RESET_TIME 10000
+#define BUTTON_DOWN_RESET_TIME 9000
 
 // Joystick Settings.
 #define DEADZONE_H 50
@@ -543,11 +553,27 @@ void listDevices()
 
 
 // ============================================================================
-
+uint64_t id;
+#define FORCE_REGENERATE_DEV_UUID false
 void setup()
 {
   Serial.begin(115200);
   //while (Serial == false); //Wait for serial monitor to connect before printing anything
+  id = ESP.getEfuseMac();
+  Serial.printf("\nCHIP MAC: %012llx\n", ESP.getEfuseMac());
+
+  // Check if we have a UUID for ourselves.
+  preferences.begin("enmed-gbg", false);
+  device_uuid = preferences.getString("dev_uuid","");
+  if (device_uuid == "" || FORCE_REGENERATE_DEV_UUID)
+  {
+    Serial.println("Missing Device UUID! Generating...");
+    uint32_t s1 = id >> 32;
+    uint32_t s2 = id & 0x00000000FFFFFFFF;
+    uuid.seed(s1, s2);
+    device_uuid = String(uuid.toCharArray());
+  }
+  Serial.printf("Device UUID: %s \n", device_uuid.c_str());
 
   // Scan Devices...
   Wire.begin();
